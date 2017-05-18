@@ -17,19 +17,56 @@ import json
 import urllib.request, urllib.parse, urllib.error
 from elasticsearch import Elasticsearch
 import random
-es = Elasticsearch()
 def index(request):
     return HttpResponse("Hello, world. You're at the polls index.")
 
 
 def Success(request):
      return HttpResponse("Success! HELL YEEAH")
+
+def GetUrls(NUMURLS):
+        Urls = []
+        List = wikipedia.search("Cartridges",NUMURLS)
+        for i in range(len(List) - 1):
+                try:
+                        All = wikipedia.page(List[i])
+                        Urls.append(All.url) 
+                except:
+                        continue
+                                
+        return Urls
+                                            
+def Fetch(NUMURLS):
+        Urls = GetUrls(NUMURLS)
+        Indexable = []
+        for i in range(len(Urls) - 1):
+                page = urllib.request.urlopen(Urls[i]).read()
+                soup = BeautifulSoup(page,"lxml")
+                if soup.find("table", {"class": "infobox"}) == None:
+                        continue
+                else:
+                        soup = soup.find("table", {"class": "infobox"})
+                        soup = soup.getText()
+                        pattern = '(Service history|Production history|Specifications|Ballistic performance)'
+                        if len(re.findall(pattern,soup)) > 0:
+                                Indexable.append(Urls[i])
+                
+        return Indexable
+"""
+def CleanDuplication(model,point)
+    for row in model.objects.all():
+        if model.objects.filter(point=row.point).count() > 1:
+            row.delete()
+
+IMPLEMENT SEPERATE FOR EACH TABLE
+"""
+
+
 def Daemon(numOptions,ManualURL):
     Urls = Fetch(numOptions)
     for i in range(0,len(Urls)):
         URL = Url(href=str(Urls[i]))
-        if(int(URL.id) < 100):
-            URL.save()
+        URL.save()
     for obj in Url.objects.all():
         try:
             if obj.href == ManualURL.href:
@@ -37,7 +74,8 @@ def Daemon(numOptions,ManualURL):
             PullData("lxml",str(obj.href))
         except:
             continue
-                   
+
+
 def get_urls(request):
     if request.method == 'POST':
         # create a form instance and populate it with data from the request:
@@ -45,9 +83,7 @@ def get_urls(request):
         # check whether it's valid:
         if form.is_valid():
                 URL = Url(href=form.cleaned_data.get('Url'))
-                #if(int(URL.id) < 100):
-                URL.save()
-                Daemon(10,URL)
+                Daemon(50,URL)
                 return HttpResponseRedirect('/Cartridges/validate/')
 
 
@@ -87,35 +123,6 @@ def PullData(PARSER_TYPE,page):
 #IMPLEMENT THREADING, HAVE CRAWLER AS A DAEMON
 #We will index all Url's with a description pane, and the name Cartridge
 #OPTIMIZE AND INTREGRTE WITH DJANGO
-def GetUrls(NUMURLS):
-        Urls = []
-        List = wikipedia.search("Cartridges",NUMURLS)
-        for i in range(len(List) - 1):
-                try:
-                        All = wikipedia.page(List[i])
-                        Urls.append(All.url) 
-                except:
-                        continue
-                                
-        return Urls
-                                            
-def Fetch(NUMURLS):
-        Urls = GetUrls(NUMURLS)
-        Indexable = []
-        for i in range(len(Urls) - 1):
-                page = urllib.request.urlopen(Urls[i]).read()
-                soup = BeautifulSoup(page,"lxml")
-                if soup.find("table", {"class": "infobox"}) == None:
-                        continue
-                else:
-                        soup = soup.find("table", {"class": "infobox"})
-                        soup = soup.getText()
-                        pattern = '(Service history|Production history|Specifications|Ballistic performance)'
-                        if len(re.findall(pattern,soup)) > 0:
-                                URL = Url(href=Urls[i])
-                                URL.save()
-                
-        return Indexable
 
 
 def ProcessList(matches):
@@ -163,16 +170,23 @@ def Process_Ballistic_Data(Data,BP):
     return BP
 
                      
+
 def Put(Data):
-  
+                es = Elasticsearch()
                 try:
                     Cartridge_Name = Data[0][0]
-                    #Type = Data[2][1]
-                    #POF = Data[3][1]
-                    Type = Data[1][0]
-                    POF = Data[2][0]
                 except:
-                    return
+                    Cartridge_Name = ""
+                #Type = Data[2][1]
+                #POF = Data[3][1]
+                try:
+                    Type = Data[1][1]
+                except:
+                    Type = ""
+                try:
+                    POF = Data[2][2]
+                except:
+                    POF = ""
                 Service_history = {"Used by" : " ", "In service" : " "}
                 Production_history = {"Designer" : " ","Designed" : " ","Manufacturer" : " ","Produced" : " ","Variants" : " "}
                 Specifications = {"Parent case": " ","Case type": " ","Bullet diameter" : " ","Neck diameter": " ","Shoulder diameter": " ","Base diameter" : " ","Rim diameter": " ", \
@@ -180,11 +194,11 @@ def Put(Data):
                 Ballistic_performance = {"Bullet mass/type" : " ", "Velocity": " ","Energy": " "}
                  
                 for items in Data:
-                        for i in range(len(items) - 2):
+                        for i in range(len(items) - 1):
                                 if(items[i] in Service_history.keys()):
                                         key = items[i]
                                         item = items[i + 1]
-                                        Service_history[key] = item              
+                                        Service_history[key] = item
                                 elif(items[i] in Production_history.keys()):
                                         key = items[i]
                                         item = items[i + 1]
@@ -248,10 +262,13 @@ def Put(Data):
                                     'Bullet mass/type': Ballistic_Performance["Bullet mass/type"],
                                     'Velocity' : Ballistic_Performance["Velocity"],
                                     'Energy': Ballistic_Performance["Energy"],
+
                     }}
+
                 """
                 Consider bulk indices, potentially better design decision. 
                 """
                 random.seed(None)
                 string = "index" + random.random()
                 res = es.index(index=string, doc_type='tweet', id=1, body=DataPoints)
+                return
