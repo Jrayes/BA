@@ -52,18 +52,14 @@ def Fetch(NUMURLS):
                                 Indexable.append(Urls[i])
                 
         return Indexable
-"""
-def CleanDuplication(model,point)
-    for row in model.objects.all():
-        if model.objects.filter(point=row.point).count() > 1:
-            row.delete()
 
-IMPLEMENT SEPERATE FOR EACH TABLE
-"""
 
 
 def Daemon(numOptions,ManualURL):
     Urls = Fetch(numOptions)
+    for obj in Url.objects.all():
+        if obj.href in Urls:
+            Urls.remove(obj.href)          
     for i in range(0,len(Urls)):
         URL = Url(href=str(Urls[i]))
         URL.save()
@@ -83,7 +79,7 @@ def get_urls(request):
         # check whether it's valid:
         if form.is_valid():
                 URL = Url(href=form.cleaned_data.get('Url'))
-                Daemon(50,URL)
+                Daemon(100,URL)
                 return HttpResponseRedirect('/Cartridges/validate/')
 
 
@@ -169,8 +165,19 @@ def Process_Ballistic_Data(Data,BP):
 
     return BP
 
-                     
-
+def CheckDuplicates(Cartridge_Name):
+    for obj in ServiceHistory.objects.all():
+        if obj.Cartridge_Name == Cartridge_Name:
+            obj.delete()
+    for obj in ProductionHistory.objects.all():
+        if obj.Cartridge_Name == Cartridge_Name:
+            obj.delete()
+    for obj in Specs.objects.all():
+        if obj.Cartridge_Name == Cartridge_Name:
+            obj.delete()
+    for obj in BallisticPerformance.objects.all():
+        if obj.Cartridge_Name == Cartridge_Name:
+            obj.delete()
 def Put(Data):
                 es = Elasticsearch()
                 try:
@@ -214,7 +221,8 @@ def Put(Data):
                 Specifications_ = Specs(Cartridge_Name=Cartridge_Name,Parent_case=Specifications["Parent case"],Case_type=Specifications["Case type"],Bullet_diameter=Specifications["Bullet diameter"], \
                                                     Neck_diameter=Specifications["Neck diameter"],Shoulder_diameter=Specifications["Shoulder diameter"],Base_diameter=Specifications["Base diameter"],Rim_diameter=Specifications["Rim diameter"],Rim_thickness=Specifications["Rim thickness"], \
                                                     Case_length=Specifications["Case length"], Overall_length=Specifications["Overall length"],Case_capacity=Specifications["Case capacity"],Rifling_twist=Specifications["Rifling twist"],Primer_type=Specifications["Primer type"],Maximum_pressure=Specifications["Maximum pressure"])
-                Ballistic_Performance = BallisticPerformance(Cartridge_Name=Cartridge_Name,Bullet_mass_type=Ballistic_performance["Bullet mass/type"],Velocity=Ballistic_performance["Velocity"],Energy=Ballistic_performance["Energy"])
+                Ballistic_Performance = BallisticPerformance(Cartridge_Name=Cartridge_Name,Bullet_mass_type=Ballistic_performance["Bullet mass/type"],Velocity=Ballistic_performance["Velocity"],Energy=Ballistic_performance["Energy"])                    
+                CheckDuplicates(Cartridge_Name)
                 Service_History.save()
                 Production_History.save()
                 Specifications_.save()
